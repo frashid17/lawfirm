@@ -403,8 +403,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         /* Input placeholder visibility */
-        .login-form input::placeholder {
-            color: rgba(255, 255, 255, 0.6) !important;
+        .login-form input::placeholder,
+        .login-form input::-webkit-input-placeholder,
+        .login-form input::-moz-placeholder,
+        .login-form input:-ms-input-placeholder {
+            color: rgba(255, 255, 255, 0.85) !important;
+            opacity: 1 !important;
         }
         
         /* Better contrast for form elements */

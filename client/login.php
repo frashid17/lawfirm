@@ -97,26 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 0 auto;
         }
         
-        .login-box {
-            animation: slideInUp 0.8s ease-out;
-            position: relative;
-            z-index: 3;
-            max-width: 450px;
-            width: 100%;
-            margin: 0 auto;
-        }
-        
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
+        /* Floating animated elements */
         .floating-shapes {
             position: fixed;
             top: 0;
@@ -126,6 +107,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pointer-events: none;
             z-index: 0;
             overflow: hidden;
+        }
+        
+        /* Footer styles */
+        footer {
+            text-align: center !important;
+        }
+        
+        footer div {
+            text-align: center !important;
+        }
+        
+        footer p {
+            text-align: center !important;
+            width: 100%;
+        }
+        
+        footer a {
+            text-align: center !important;
         }
         
         .shape {
@@ -154,6 +153,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: rgba(99, 102, 241, 0.15);
         }
         
+        .shape:nth-child(3) {
+            width: 200px;
+            height: 200px;
+            top: 50%;
+            left: 5%;
+            animation-delay: 6s;
+            background: rgba(236, 72, 153, 0.12);
+        }
+        
+        .shape:nth-child(4) {
+            width: 250px;
+            height: 250px;
+            top: 20%;
+            right: 10%;
+            animation-delay: 9s;
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        /* Add subtle speckles */
+        .login-page::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
         @keyframes float {
             0%, 100% {
                 transform: translate(0, 0) rotate(0deg);
@@ -169,16 +200,137 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        footer {
-            background: rgba(15, 23, 42, 0.9);
-            color: #ffffff;
-            padding: 25px 20px;
+        /* Enhanced login box */
+        .login-box {
+            animation: slideInUp 0.8s ease-out;
             position: relative;
-            z-index: 1;
+            z-index: 3;
+            max-width: 450px;
             width: 100%;
-            box-sizing: border-box;
-            margin-top: 60px;
-            text-align: center;
+            margin: 0 auto;
+            transform: translateY(0);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25) !important;
+            backdrop-filter: blur(30px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+            border: 2px solid rgba(255, 255, 255, 0.4) !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Enhanced icon wrapper */
+        .icon-wrapper {
+            animation: bounceIn 1s ease-out;
+            background: rgba(255, 255, 255, 0.3) !important;
+            border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        }
+        
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        .login-header h1 {
+            color: #ffffff !important;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+            font-size: 36px !important;
+            font-weight: 700 !important;
+        }
+        
+        .login-header h2 {
+            color: rgba(255, 255, 255, 0.95) !important;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2) !important;
+            font-size: 16px !important;
+            font-weight: 400 !important;
+        }
+        
+        /* Form inputs with glow effect */
+        .login-form .form-group input:focus,
+        .login-form .form-group select:focus {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.35);
+        }
+        
+        /* Ensure labels are visible */
+        .login-form .form-group label {
+            color: #ffffff !important;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Input placeholder visibility */
+        .login-form input::placeholder,
+        .login-form input::-webkit-input-placeholder,
+        .login-form input::-moz-placeholder,
+        .login-form input:-ms-input-placeholder {
+            color: rgba(255, 255, 255, 0.85) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Better contrast for form elements */
+        .login-form input,
+        .login-form select {
+            color: rgba(255, 255, 255, 0.95) !important;
+        }
+        
+        /* Button hover effects */
+        .btn-primary {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-primary:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        /* Pulse animation for icon */
+        .icon-wrapper i {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
         }
     </style>
 </head>
@@ -187,13 +339,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="floating-shapes">
         <div class="shape"></div>
         <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
     </div>
     
     <div class="login-container">
         <div class="login-box glass-effect">
             <div class="login-header">
                 <div class="icon-wrapper">
-                    <i class="fas fa-user"></i>
+                    <i class="fas fa-user-circle"></i>
                 </div>
                 <h1>Client Portal</h1>
                 <h2>Access Your Cases & Documents</h2>
@@ -251,8 +405,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     
     <!-- Footer -->
-    <footer>
+    <footer style="background: rgba(15, 23, 42, 0.9); color: #ffffff; padding: 25px 20px; position: relative; z-index: 1; width: 100%; box-sizing: border-box; margin-top: 60px;">
         <div style="max-width: 1200px; margin: 0 auto; text-align: center !important; width: 100%;">
+            <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 10px; text-align: center !important; width: 100%;">
+                <a href="../database/check_users.php" style="color: #a78bfa; text-decoration: none; transition: color 0.3s; display: inline-block; text-align: center;"><i class="fas fa-question-circle"></i> Having login issues? Check Users</a>
+            </p>
             <p style="color: #94a3b8; font-size: 12px; text-align: center !important; margin: 0; width: 100%;">&copy; <?php echo date('Y'); ?> Law Firm Management System. All rights reserved.</p>
         </div>
     </footer>
