@@ -11,7 +11,27 @@ requireRole('receptionist');
 $message = "";
 $error = "";
 
-// Handle form submission (add only - receptionist can't delete)
+// Handle delete client
+if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    try {
+        // Check if client has active cases
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM `CASE` WHERE ClientId = ? AND Status = 'Active'");
+        $stmt->execute([$_GET['delete']]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result['count'] > 0) {
+            $error = "Cannot delete client with active cases. Please close or reassign cases first.";
+        } else {
+            $stmt = $conn->prepare("DELETE FROM CLIENT WHERE ClientId = ?");
+            $stmt->execute([$_GET['delete']]);
+            $message = "Client deleted successfully";
+        }
+    } catch(PDOException $e) {
+        $error = "Error deleting client: " . $e->getMessage();
+    }
+}
+
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $client_id = $_POST['client_id'] ?? null;
     $firstname = trim($_POST['firstname'] ?? '');
@@ -74,7 +94,50 @@ include 'header.php';
     <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
-<div class="form-container">
+<div class="card">
+    <h3>All Clients</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (count($clients) > 0): ?>
+                    <?php foreach ($clients as $client): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($client['ClientId']); ?></td>
+                            <td><?php echo htmlspecialchars($client['FirstName'] . ' ' . $client['LastName']); ?></td>
+                            <td><?php echo htmlspecialchars($client['PhoneNo']); ?></td>
+                            <td><?php echo htmlspecialchars($client['Email'] ?? '-'); ?></td>
+                            <td><?php echo htmlspecialchars($client['Address'] ?? '-'); ?></td>
+                            <td>
+                                <a href="?edit=<?php echo $client['ClientId']; ?>" class="btn btn-sm btn-success">Edit</a>
+                                <a href="?delete=<?php echo $client['ClientId']; ?>" 
+                                   class="btn btn-sm btn-danger" 
+                                   onclick="return confirm('Are you sure you want to delete this client? This action cannot be undone.');">
+                                    <i class="fas fa-trash"></i> Delete
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="6" class="empty-state">No clients found</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mt-20">
     <h3><?php echo $edit_client ? 'Edit Client' : 'Register New Client'; ?></h3>
     <form method="POST" action="">
         <?php if ($edit_client): ?>
@@ -117,44 +180,6 @@ include 'header.php';
             <?php endif; ?>
         </div>
     </form>
-</div>
-
-<div class="card mt-20">
-    <h3>All Clients</h3>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Address</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (count($clients) > 0): ?>
-                    <?php foreach ($clients as $client): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($client['ClientId']); ?></td>
-                            <td><?php echo htmlspecialchars($client['FirstName'] . ' ' . $client['LastName']); ?></td>
-                            <td><?php echo htmlspecialchars($client['PhoneNo']); ?></td>
-                            <td><?php echo htmlspecialchars($client['Email'] ?? '-'); ?></td>
-                            <td><?php echo htmlspecialchars($client['Address'] ?? '-'); ?></td>
-                            <td>
-                                <a href="?edit=<?php echo $client['ClientId']; ?>" class="btn btn-sm btn-success">Edit</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="6" class="empty-state">No clients found</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
 </div>
 
 <?php include 'footer.php'; ?>
