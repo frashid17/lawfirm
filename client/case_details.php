@@ -81,8 +81,10 @@ try {
                 <li><a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
                 <li><a href="my_cases.php" class="active"><i class="fas fa-folder-open"></i> My Cases</a></li>
                 <li><a href="invoices.php"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
+                <li><a href="payment_history.php"><i class="fas fa-history"></i> Payment History</a></li>
                 <li><a href="documents.php"><i class="fas fa-file"></i> Documents</a></li>
                 <li><a href="messages.php"><i class="fas fa-comments"></i> Messages</a></li>
+                <li><a href="events.php"><i class="fas fa-calendar-alt"></i> Events</a></li>
             </ul>
         </div>
     </div>

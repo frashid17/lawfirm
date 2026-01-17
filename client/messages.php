@@ -17,13 +17,16 @@ $client_id = $_SESSION['client_id'];
 $message = "";
 $error = "";
 
-// Handle sending message
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
+
+// Handle sending message - check for POST with message data
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_message']) || (isset($_POST['message']) && !empty(trim($_POST['message']))))) {
     $case_no = $_POST['case_no'] ?? null;
     $message_text = trim($_POST['message'] ?? '');
     
-    if (empty($case_no) || empty($message_text)) {
-        $error = "Please select a case and enter a message";
+    if (empty($case_no)) {
+        $error = "Please select a case";
+    } elseif (empty($message_text)) {
+        $error = "Please enter a message";
     } else {
         try {
             // Get advocate assigned to case
@@ -32,9 +35,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
             $assignment = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($assignment) {
-                $stmt = $conn->prepare("INSERT INTO MESSAGE (CaseNo, ClientId, AdvocateId, SenderRole, Message) VALUES (?, ?, ?, 'client', ?)");
-                $stmt->execute([$case_no, $client_id, $assignment['AdvtId'], $message_text]);
-                $message = "Message sent successfully";
+                try {
+                    $stmt = $conn->prepare("INSERT INTO MESSAGE (CaseNo, ClientId, AdvocateId, SenderRole, Message) VALUES (?, ?, ?, 'client', ?)");
+                    $result = $stmt->execute([$case_no, $client_id, $assignment['AdvtId'], $message_text]);
+                    
+                    if ($result) {
+                        $message_id = $conn->lastInsertId();
+                        if ($message_id > 0) {
+                            header("Location: messages.php?case=" . urlencode($case_no) . "&sent=1");
+                            exit();
+                        } else {
+                            $error = "Message was not inserted. Please check database connection.";
+                        }
+                    } else {
+                        $error_info = $stmt->errorInfo();
+                        $error = "Failed to send message. SQL Error: " . ($error_info[2] ?? 'Unknown error');
+                    }
+                } catch(PDOException $e) {
+                    if ($e->getCode() == '42S02') {
+                        $error = "MESSAGE table does not exist in database. Please run database/create_message_table.sql in phpMyAdmin first.";
+                    } else {
+                        $error = "Error sending message: " . $e->getMessage() . " (Code: " . $e->getCode() . ")";
+                    }
+                }
             } else {
                 $error = "No advocate assigned to this case";
             }
@@ -43,6 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
         }
     }
 }
+
+// Check if message was just sent
+// Check if message was just sent (used for auto-refresh cooldown, no alert shown)
+// The sent parameter is used by JavaScript to prevent auto-refresh after sending
 
 // Mark messages as read
 if (isset($_GET['mark_read']) && is_numeric($_GET['mark_read'])) {
@@ -151,36 +178,96 @@ if ($selected_case) {
             display: flex;
             flex-direction: column;
             gap: 15px;
+            background: #f0f2f5;
         }
         .message-item {
             display: flex;
             gap: 10px;
         }
+        /* Client view: Client messages on RIGHT, Advocate messages on LEFT */
         .message-item.client {
-            flex-direction: row-reverse;
+            justify-content: flex-end;
+        }
+        .message-item.advocate {
+            justify-content: flex-start;
         }
         .message-bubble {
             max-width: 70%;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 12px;
             word-wrap: break-word;
+            position: relative;
         }
+        /* Client messages (sent by client) - green, right side */
         .message-item.client .message-bubble {
-            background: var(--primary-color);
-            color: white;
+            background: #dcf8c6;
+            color: #000;
+            border-bottom-right-radius: 4px;
         }
+        /* Advocate messages (received from advocate) - white, left side */
         .message-item.advocate .message-bubble {
-            background: #e5e7eb;
+            background: white;
             color: var(--dark-text);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .message-time {
             font-size: 11px;
-            color: var(--gray);
             margin-top: 4px;
+            opacity: 0.7;
         }
         .message-form {
-            padding: 15px;
+            padding: 10px 15px;
             border-top: 1px solid var(--border);
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .message-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: #f0f2f5;
+            border-radius: 24px;
+            padding: 8px 16px;
+            gap: 8px;
+        }
+        .message-input-wrapper input[type="text"] {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            padding: 6px 0;
+            font-size: 15px;
+            color: var(--dark-text);
+        }
+        .message-input-wrapper input[type="text"]::placeholder {
+            color: #999;
+        }
+        .send-btn {
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 18px;
+        }
+        .send-btn:hover {
+            background: var(--secondary-color);
+            transform: scale(1.05);
+        }
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -201,17 +288,15 @@ if ($selected_case) {
                 <li><a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
                 <li><a href="my_cases.php"><i class="fas fa-folder-open"></i> My Cases</a></li>
                 <li><a href="invoices.php"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
+                <li><a href="payment_history.php"><i class="fas fa-history"></i> Payment History</a></li>
                 <li><a href="documents.php"><i class="fas fa-file"></i> Documents</a></li>
                 <li><a href="messages.php" class="active"><i class="fas fa-comments"></i> Messages</a></li>
+                <li><a href="events.php"><i class="fas fa-calendar-alt"></i> Events</a></li>
             </ul>
         </div>
     </div>
     
     <div class="container">
-        <?php if ($message): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
-        <?php endif; ?>
-        
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
@@ -248,7 +333,9 @@ if ($selected_case) {
                             <?php foreach ($messages as $msg): ?>
                                 <div class="message-item <?php echo $msg['SenderRole']; ?>">
                                     <div class="message-bubble">
-                                        <div><?php echo nl2br(htmlspecialchars($msg['Message'])); ?></div>
+                                        <?php if (!empty($msg['Message'])): ?>
+                                            <div><?php echo nl2br(htmlspecialchars($msg['Message'])); ?></div>
+                                        <?php endif; ?>
                                         <?php if ($msg['SenderRole'] == 'advocate'): ?>
                                             <div class="message-time">
                                                 <?php echo htmlspecialchars($msg['FirstName'] . ' ' . $msg['LastName']); ?> • 
@@ -267,15 +354,15 @@ if ($selected_case) {
                         <?php endif; ?>
                     </div>
                     
-                    <form method="POST" action="" class="message-form">
+                    <form method="POST" action="" class="message-form" id="messageForm" onsubmit="return handleFormSubmit(event)">
                         <input type="hidden" name="case_no" value="<?php echo $selected_case; ?>">
-                        <div style="display: flex; gap: 10px;">
-                            <textarea name="message" rows="2" style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; resize: none;" 
-                                      placeholder="Type your message..." required></textarea>
-                            <button type="submit" name="send_message" class="btn btn-primary" style="padding: 10px 20px;">
-                                <i class="fas fa-paper-plane"></i> Send
-                            </button>
+                        <input type="hidden" name="send_message" value="1">
+                        <div class="message-input-wrapper">
+                            <input type="text" name="message" id="messageInput" placeholder="Type a message..." autocomplete="off">
                         </div>
+                        <button type="submit" name="send_message" class="send-btn" id="sendBtn" title="Send">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </form>
                 <?php else: ?>
                     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
@@ -293,9 +380,72 @@ if ($selected_case) {
             messagesList.scrollTop = messagesList.scrollHeight;
         }
         
-        // Auto-refresh every 5 seconds
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        function checkInput() {
+            const hasText = messageInput.value.trim().length > 0;
+            sendBtn.disabled = !hasText;
+        }
+        
+        messageInput.addEventListener('input', checkInput);
+        checkInput();
+        
+        // Prevent duplicate form submissions
+        let formSubmitting = false;
+        function handleFormSubmit(e) {
+            if (formSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            formSubmitting = true;
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            return true;
+        }
+        
+        // Track if user is typing
+        let isTyping = false;
+        let typingTimeout;
+        
+        messageInput.addEventListener('focus', function() {
+            isTyping = true;
+        });
+        
+        messageInput.addEventListener('input', function() {
+            isTyping = true;
+            clearTimeout(typingTimeout);
+            // Reset typing flag after 2 seconds of no typing
+            typingTimeout = setTimeout(function() {
+                isTyping = false;
+            }, 2000);
+        });
+        
+        messageInput.addEventListener('blur', function() {
+            setTimeout(function() {
+                isTyping = false;
+            }, 1000);
+        });
+        
+        // Track if message was just sent
+        let messageJustSent = <?php echo (isset($_GET['sent']) && $_GET['sent'] == '1') ? 'true' : 'false'; ?>;
+        let sendCooldown = 0;
+        
+        // Disable auto-refresh for 10 seconds after sending
+        if (messageJustSent) {
+            sendCooldown = 10;
+            let cooldownInterval = setInterval(function() {
+                sendCooldown--;
+                if (sendCooldown <= 0) {
+                    clearInterval(cooldownInterval);
+                }
+            }, 1000);
+        }
+        
+        // Auto-refresh every 5 seconds (only if user is not typing and not in cooldown)
         setInterval(function() {
-            if (document.visibilityState === 'visible') {
+            if (document.visibilityState === 'visible' && !isTyping && messageInput.value.trim() === '' && sendCooldown <= 0) {
                 location.reload();
             }
         }, 5000);
