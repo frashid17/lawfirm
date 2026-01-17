@@ -73,6 +73,72 @@ try {
     $error = "Error loading clients: " . $e->getMessage();
 }
 
+// Get all advocates for assignment dropdown
+try {
+    $stmt = $conn->query("SELECT AdvtId, FirstName, LastName FROM ADVOCATE WHERE Status = 'Active' ORDER BY LastName, FirstName");
+    $advocates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    $error = "Error loading advocates: " . $e->getMessage();
+}
+
+// Get current assignments for the case being edited
+$current_assignments = [];
+if ($edit_case) {
+    try {
+        $stmt = $conn->prepare("SELECT ca.*, a.FirstName, a.LastName FROM CASE_ASSIGNMENT ca JOIN ADVOCATE a ON ca.AdvtId = a.AdvtId WHERE ca.CaseNo = ?");
+        $stmt->execute([$edit_case['CaseNo']]);
+        $current_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch(PDOException $e) {
+        // Silent fail
+    }
+}
+
+// Handle assignment addition
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_assignment'])) {
+    $case_no = $_POST['case_no'] ?? null;
+    $advt_id = $_POST['advt_id'] ?? null;
+    
+    if (empty($case_no) || empty($advt_id)) {
+        $error = "Please select an advocate";
+    } else {
+        try {
+            // Check if assignment already exists
+            $stmt = $conn->prepare("SELECT AssId FROM CASE_ASSIGNMENT WHERE CaseNo = ? AND AdvtId = ?");
+            $stmt->execute([$case_no, $advt_id]);
+            if ($stmt->fetch()) {
+                $error = "This case is already assigned to this advocate";
+            } else {
+                $stmt = $conn->prepare("INSERT INTO CASE_ASSIGNMENT (CaseNo, AdvtId, AssignedDate, Status) VALUES (?, ?, CURDATE(), 'Active')");
+                $stmt->execute([$case_no, $advt_id]);
+                $message = "Advocate assigned successfully";
+                // Reload assignments
+                $stmt = $conn->prepare("SELECT ca.*, a.FirstName, a.LastName FROM CASE_ASSIGNMENT ca JOIN ADVOCATE a ON ca.AdvtId = a.AdvtId WHERE ca.CaseNo = ?");
+                $stmt->execute([$case_no]);
+                $current_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch(PDOException $e) {
+            $error = "Error assigning advocate: " . $e->getMessage();
+        }
+    }
+}
+
+// Handle assignment removal
+if (isset($_GET['remove_assignment']) && is_numeric($_GET['remove_assignment'])) {
+    try {
+        $stmt = $conn->prepare("DELETE FROM CASE_ASSIGNMENT WHERE AssId = ?");
+        $stmt->execute([$_GET['remove_assignment']]);
+        $message = "Assignment removed successfully";
+        // Reload assignments if editing a case
+        if ($edit_case) {
+            $stmt = $conn->prepare("SELECT ca.*, a.FirstName, a.LastName FROM CASE_ASSIGNMENT ca JOIN ADVOCATE a ON ca.AdvtId = a.AdvtId WHERE ca.CaseNo = ?");
+            $stmt->execute([$edit_case['CaseNo']]);
+            $current_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch(PDOException $e) {
+        $error = "Error removing assignment: " . $e->getMessage();
+    }
+}
+
 // Get all cases with search
 try {
     $search = $_GET['search'] ?? '';
@@ -193,6 +259,77 @@ include 'header.php';
             <?php endif; ?>
         </div>
     </form>
+    
+    <?php if ($edit_case): ?>
+        <!-- Advocate Assignment Section -->
+        <div class="card mt-20" style="margin-top: 30px;">
+            <h3><i class="fas fa-user-tie"></i> Assign Advocates</h3>
+            <form method="POST" action="" style="margin-bottom: 20px;">
+                <input type="hidden" name="case_no" value="<?php echo htmlspecialchars($edit_case['CaseNo']); ?>">
+                <div style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label for="advt_id">Select Advocate</label>
+                        <select id="advt_id" name="advt_id" required>
+                            <option value="">-- Select Advocate --</option>
+                            <?php foreach ($advocates as $advocate): ?>
+                                <?php
+                                // Check if already assigned
+                                $is_assigned = false;
+                                foreach ($current_assignments as $ass) {
+                                    if ($ass['AdvtId'] == $advocate['AdvtId']) {
+                                        $is_assigned = true;
+                                        break;
+                                    }
+                                }
+                                ?>
+                                <?php if (!$is_assigned): ?>
+                                    <option value="<?php echo $advocate['AdvtId']; ?>">
+                                        <?php echo htmlspecialchars($advocate['FirstName'] . ' ' . $advocate['LastName']); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" name="add_assignment" class="btn btn-primary" style="width: auto; padding: 14px 24px;">
+                        <i class="fas fa-plus"></i> Assign
+                    </button>
+                </div>
+            </form>
+            
+            <?php if (count($current_assignments) > 0): ?>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Advocate</th>
+                                <th>Assigned Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($current_assignments as $ass): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($ass['FirstName'] . ' ' . $ass['LastName']); ?></td>
+                                    <td><?php echo htmlspecialchars($ass['AssignedDate']); ?></td>
+                                    <td><?php echo htmlspecialchars($ass['Status']); ?></td>
+                                    <td>
+                                        <a href="?edit=<?php echo $edit_case['CaseNo']; ?>&remove_assignment=<?php echo $ass['AssId']; ?>" 
+                                           class="btn btn-sm btn-danger" 
+                                           onclick="return confirm('Are you sure you want to remove this assignment?');">
+                                            <i class="fas fa-times"></i> Remove
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <p style="color: var(--gray); text-align: center; padding: 20px;">No advocates assigned to this case yet.</p>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <div class="card mt-20">
