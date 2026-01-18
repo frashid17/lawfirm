@@ -29,9 +29,97 @@ if (isset($_SESSION['client_id'])) {
 require_once 'config/database.php';
 
 $error = "";
+$show_security_question = false;
+$security_question = "";
+$login_attempt = $_SESSION['login_attempt'] ?? null;
 
-// Process login form
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Handle security question answer
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['security_answer'])) {
+    $security_answer = trim($_POST['security_answer'] ?? '');
+    $username = $_SESSION['login_attempt']['username'] ?? '';
+    $role = $_SESSION['login_attempt']['role'] ?? '';
+    $user_id = $_SESSION['login_attempt']['user_id'] ?? null;
+    $table_name = $_SESSION['login_attempt']['table_name'] ?? '';
+    $id_field = $_SESSION['login_attempt']['id_field'] ?? '';
+    
+    if (empty($security_answer)) {
+        $error = "Please enter your security answer";
+        $show_security_question = true;
+        $security_question = $_SESSION['login_attempt']['security_question'] ?? '';
+    } else {
+        try {
+            // Get user's security answer
+            $stmt = $conn->prepare("SELECT SecurityAnswer, FailedAttempts, IsLocked FROM {$table_name} WHERE {$id_field} = ?");
+            $stmt->execute([$user_id]);
+            $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user_data) {
+                $error = "User not found";
+                unset($_SESSION['login_attempt']);
+            } elseif ($user_data['IsLocked']) {
+                $error = "Your account is locked. Please contact the administrator to unlock it.";
+                unset($_SESSION['login_attempt']);
+            } else {
+                // Check if security answer matches (case-insensitive)
+                if (strtolower(trim($user_data['SecurityAnswer'])) === strtolower(trim($security_answer))) {
+                    // Correct answer - reset failed attempts and complete login
+                    $stmt = $conn->prepare("UPDATE {$table_name} SET FailedAttempts = 0 WHERE {$id_field} = ?");
+                    $stmt->execute([$user_id]);
+                    
+                    // Set session variables and redirect
+                    if ($role === 'client') {
+                        $_SESSION['client_id'] = $_SESSION['login_attempt']['client_id'];
+                        $_SESSION['client_name'] = $_SESSION['login_attempt']['user_name'];
+                        $_SESSION['client_email'] = $_SESSION['login_attempt']['email'] ?? '';
+                        unset($_SESSION['login_attempt']);
+                        header("Location: client/dashboard.php");
+                    } else {
+                        $_SESSION['user_id'] = $user_id;
+                        $_SESSION['user_role'] = $role;
+                        $_SESSION['user_name'] = $_SESSION['login_attempt']['user_name'];
+                        $_SESSION['username'] = $username;
+                        unset($_SESSION['login_attempt']);
+                        
+                        if ($role === 'admin') {
+                            header("Location: admin/dashboard.php");
+                        } elseif ($role === 'advocate') {
+                            header("Location: advocate/dashboard.php");
+                        } elseif ($role === 'receptionist') {
+                            header("Location: receptionist/dashboard.php");
+                        }
+                    }
+                    exit();
+                } else {
+                    // Wrong answer - increment failed attempts
+                    $failed_attempts = ($user_data['FailedAttempts'] ?? 0) + 1;
+                    $is_locked = false;
+                    
+                    // Lock account after 3 failed attempts
+                    if ($failed_attempts >= 3) {
+                        $is_locked = true;
+                        $stmt = $conn->prepare("UPDATE {$table_name} SET FailedAttempts = ?, IsLocked = TRUE, LockedAt = NOW() WHERE {$id_field} = ?");
+                        $stmt->execute([$failed_attempts, $user_id]);
+                        $error = "Your account has been locked after 3 failed attempts. Please contact the administrator to unlock it.";
+                        unset($_SESSION['login_attempt']);
+                    } else {
+                        $stmt = $conn->prepare("UPDATE {$table_name} SET FailedAttempts = ? WHERE {$id_field} = ?");
+                        $stmt->execute([$failed_attempts, $user_id]);
+                        $remaining = 5 - $failed_attempts;
+                        $error = "Incorrect security answer. You have {$remaining} attempt(s) remaining.";
+                        $show_security_question = true;
+                        $security_question = $_SESSION['login_attempt']['security_question'] ?? '';
+                    }
+                }
+            }
+        } catch(PDOException $e) {
+            $error = "Login error: " . $e->getMessage();
+            unset($_SESSION['login_attempt']);
+        }
+    }
+}
+
+// Process initial login form (username/password)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['security_answer'])) {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $role = $_POST['role'] ?? '';
@@ -44,6 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = null;
             $user_id = null;
             $user_name = null;
+            $table_name = '';
+            $id_field = '';
+            $security_question_field = '';
             
             if ($role === 'admin') {
                 $stmt = $conn->prepare("SELECT AdminId, FirstName, LastName, Password FROM ADMIN WHERE Username = ?");
@@ -54,60 +145,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user_name = $user['FirstName'] . ' ' . $user['LastName'];
                 }
             } elseif ($role === 'advocate') {
-                $stmt = $conn->prepare("SELECT AdvtId, FirstName, LastName, Password FROM ADVOCATE WHERE Username = ? AND Status = 'Active'");
+                $stmt = $conn->prepare("SELECT AdvtId, FirstName, LastName, Password, IsLocked, SecurityQuestion FROM ADVOCATE WHERE Username = ? AND Status = 'Active'");
                 $stmt->execute([$username]);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($user) {
                     $user_id = $user['AdvtId'];
                     $user_name = $user['FirstName'] . ' ' . $user['LastName'];
+                    $table_name = 'ADVOCATE';
+                    $id_field = 'AdvtId';
+                    $security_question_field = $user['SecurityQuestion'] ?? '';
                 }
             } elseif ($role === 'receptionist') {
-                $stmt = $conn->prepare("SELECT RecId, FirstName, LastName, Password FROM RECEPTIONIST WHERE Username = ?");
+                $stmt = $conn->prepare("SELECT RecId, FirstName, LastName, Password, IsLocked, SecurityQuestion FROM RECEPTIONIST WHERE Username = ?");
                 $stmt->execute([$username]);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($user) {
                     $user_id = $user['RecId'];
                     $user_name = $user['FirstName'] . ' ' . $user['LastName'];
+                    $table_name = 'RECEPTIONIST';
+                    $id_field = 'RecId';
+                    $security_question_field = $user['SecurityQuestion'] ?? '';
                 }
             } elseif ($role === 'client') {
-                $stmt = $conn->prepare("SELECT ca.*, c.ClientId, c.FirstName, c.LastName 
+                $stmt = $conn->prepare("SELECT ca.*, c.ClientId, c.FirstName, c.LastName, c.Email 
                                         FROM CLIENT_AUTH ca 
                                         JOIN CLIENT c ON ca.ClientId = c.ClientId 
                                         WHERE ca.Username = ? AND ca.IsActive = TRUE");
                 $stmt->execute([$username]);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($user) {
-                    $user_id = $user['ClientId'];
+                    $user_id = $user['AuthId']; // Use AuthId for CLIENT_AUTH table
                     $user_name = $user['FirstName'] . ' ' . $user['LastName'];
+                    $table_name = 'CLIENT_AUTH';
+                    $id_field = 'AuthId';
+                    $security_question_field = $user['SecurityQuestion'] ?? '';
                 }
             }
             
             // Verify password
             if ($user) {
-                // Check if password is hashed or plain text (for debugging)
                 if (password_verify($password, $user['Password'])) {
-                    // Set session variables
-                    if ($role === 'client') {
-                        $_SESSION['client_id'] = $user_id;
-                        $_SESSION['client_name'] = $user_name;
-                        $_SESSION['client_email'] = $user['Email'] ?? '';
-                        header("Location: client/dashboard.php");
-                    } else {
+                    // Check if account is locked (for non-admin users)
+                    if ($role !== 'admin' && isset($user['IsLocked']) && $user['IsLocked']) {
+                        $error = "Your account is locked. Please contact the administrator to unlock it.";
+                    } elseif ($role === 'admin') {
+                        // Admin doesn't need security question - login directly
                         $_SESSION['user_id'] = $user_id;
                         $_SESSION['user_role'] = $role;
                         $_SESSION['user_name'] = $user_name;
                         $_SESSION['username'] = $username;
-                        
-                        // Redirect based on role
-                        if ($role === 'admin') {
-                            header("Location: admin/dashboard.php");
-                        } elseif ($role === 'advocate') {
-                            header("Location: advocate/dashboard.php");
-                        } elseif ($role === 'receptionist') {
-                            header("Location: receptionist/dashboard.php");
+                        header("Location: admin/dashboard.php");
+                        exit();
+                    } elseif (empty($security_question_field)) {
+                        // No security question set - allow login but warn user
+                        if ($role === 'client') {
+                            $_SESSION['client_id'] = $user_id;
+                            $_SESSION['client_name'] = $user_name;
+                            $_SESSION['client_email'] = $user['Email'] ?? '';
+                            header("Location: client/dashboard.php");
+                        } else {
+                            $_SESSION['user_id'] = $user_id;
+                            $_SESSION['user_role'] = $role;
+                            $_SESSION['user_name'] = $user_name;
+                            $_SESSION['username'] = $username;
+                            
+                            if ($role === 'advocate') {
+                                header("Location: advocate/dashboard.php");
+                            } elseif ($role === 'receptionist') {
+                                header("Location: receptionist/dashboard.php");
+                            }
                         }
+                        exit();
+                    } else {
+                        // Password correct, show security question
+                        $_SESSION['login_attempt'] = [
+                            'username' => $username,
+                            'role' => $role,
+                            'user_id' => $user_id,
+                            'user_name' => $user_name,
+                            'table_name' => $table_name,
+                            'id_field' => $id_field,
+                            'security_question' => $security_question_field,
+                            'email' => $user['Email'] ?? '',
+                            'client_id' => ($role === 'client' ? $user['ClientId'] : null)
+                        ];
+                        $show_security_question = true;
+                        $security_question = $security_question_field;
                     }
-                    exit();
                 } else {
                     if ($role === 'client') {
                         $error = "Incorrect password. Please contact the administrator if you forgot your password.";
@@ -126,6 +250,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Login error: " . $e->getMessage();
         }
     }
+}
+
+// Check if we should show security question from session
+if (isset($_SESSION['login_attempt']) && !$show_security_question) {
+    $show_security_question = true;
+    $security_question = $_SESSION['login_attempt']['security_question'] ?? '';
 }
 ?>
 <!DOCTYPE html>
@@ -482,48 +612,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
             
-            <form method="POST" action="" class="login-form">
-                <div class="form-group">
-                    <label for="role">
-                        <i class="fas fa-user-tag"></i> Select Role
-                    </label>
-                    <div class="input-wrapper">
-                        <select name="role" id="role" required>
-                            <option value="">-- Select Role --</option>
-                            <option value="admin">Administrator</option>
-                            <option value="advocate">Advocate</option>
-                            <option value="receptionist">Receptionist</option>
-                            <option value="client">Client</option>
-                        </select>
-                        <i class="fas fa-chevron-down input-icon"></i>
+            <?php if ($show_security_question): ?>
+                <form method="POST" action="" class="login-form">
+                    <div class="form-group">
+                        <label style="color: #ffffff; font-weight: 600; margin-bottom: 10px; display: block;">
+                            <i class="fas fa-question-circle"></i> Security Question
+                        </label>
+                        <div style="background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #ffffff; font-size: 14px;">
+                            <?php echo htmlspecialchars($security_question); ?>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="username">
-                        <i class="fas fa-user"></i> Username
-                    </label>
-                    <div class="input-wrapper">
-                        <input type="text" id="username" name="username" required autofocus placeholder="Enter your username">
-                        <i class="fas fa-user input-icon"></i>
+                    
+                    <div class="form-group">
+                        <label for="security_answer">
+                            <i class="fas fa-key"></i> Your Answer
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="security_answer" name="security_answer" required autofocus placeholder="Enter your security answer">
+                            <i class="fas fa-key input-icon"></i>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">
-                        <i class="fas fa-lock"></i> Password
-                    </label>
-                    <div class="input-wrapper">
-                        <input type="password" id="password" name="password" required placeholder="Enter your password">
-                        <i class="fas fa-lock input-icon"></i>
+                    
+                    <button type="submit" class="btn btn-primary btn-login">
+                        <span>Verify Answer</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    
+                    <div style="margin-top: 15px; text-align: center;">
+                        <a href="login.php" class="btn btn-secondary btn-sm" style="width: 100%;">
+                            <i class="fas fa-arrow-left"></i> Back to Login
+                        </a>
                     </div>
-                </div>
-                
-                <button type="submit" class="btn btn-primary btn-login">
-                    <span>Sign In</span>
-                    <i class="fas fa-arrow-right"></i>
-                </button>
-            </form>
+                </form>
+            <?php else: ?>
+                <form method="POST" action="" class="login-form">
+                    <div class="form-group">
+                        <label for="role">
+                            <i class="fas fa-user-tag"></i> Select Role
+                        </label>
+                        <div class="input-wrapper">
+                            <select name="role" id="role" required>
+                                <option value="">-- Select Role --</option>
+                                <option value="admin">Administrator</option>
+                                <option value="advocate">Advocate</option>
+                                <option value="receptionist">Receptionist</option>
+                                <option value="client">Client</option>
+                            </select>
+                            <i class="fas fa-chevron-down input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="username" name="username" required autofocus placeholder="Enter your username">
+                            <i class="fas fa-user input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="password" id="password" name="password" required placeholder="Enter your password">
+                            <i class="fas fa-lock input-icon"></i>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-login">
+                        <span>Sign In</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </form>
+            <?php endif; ?>
             
             <div style="margin-top: 32px; text-align: center;">
                 <a href="index.php" class="btn btn-secondary" style="width: 100%;">
