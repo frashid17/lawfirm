@@ -324,6 +324,7 @@ $month_names = ['January', 'February', 'March', 'April', 'May', 'June',
                 <li><a href="documents.php"><i class="fas fa-file"></i> Documents</a></li>
                 <li><a href="messages.php"><i class="fas fa-comments"></i> Messages</a></li>
                 <li><a href="events.php" class="active"><i class="fas fa-calendar-alt"></i> Events</a></li>
+                <li><a href="profile.php"><i class="fas fa-user"></i> Profile</a></li>
             </ul>
         </div>
     </div>

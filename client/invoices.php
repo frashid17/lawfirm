@@ -171,6 +171,7 @@ try {
                 <li><a href="documents.php"><i class="fas fa-file"></i> Documents</a></li>
                 <li><a href="messages.php"><i class="fas fa-comments"></i> Messages</a></li>
                 <li><a href="events.php"><i class="fas fa-calendar-alt"></i> Events</a></li>
+                <li><a href="profile.php"><i class="fas fa-user"></i> Profile</a></li>
             </ul>
         </div>
     </div>
