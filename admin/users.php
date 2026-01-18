@@ -11,6 +11,46 @@ requireRole('admin');
 $message = "";
 $error = "";
 
+// Predefined security questions
+$security_questions = [
+    "What was the name of your first pet?",
+    "What city were you born in?",
+    "What was your mother's maiden name?",
+    "What was the name of your elementary school?",
+    "What was your childhood nickname?",
+    "What street did you grow up on?",
+    "What was the make of your first car?",
+    "What is your favorite movie?",
+    "What was the name of your first teacher?",
+    "What is your favorite food?",
+    "What was your favorite sport in high school?",
+    "What is the name of your best friend from childhood?",
+    "What was your favorite book as a child?",
+    "What is the name of the hospital where you were born?",
+    "What was your favorite vacation destination?"
+];
+
+// Password validation function
+function validatePassword($password) {
+    $errors = [];
+    if (strlen($password) < 8) {
+        $errors[] = "Password must be at least 8 characters long";
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        $errors[] = "Password must contain at least one uppercase letter";
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        $errors[] = "Password must contain at least one lowercase letter";
+    }
+    if (!preg_match('/[0-9]/', $password)) {
+        $errors[] = "Password must contain at least one number";
+    }
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+        $errors[] = "Password must contain at least one special character";
+    }
+    return $errors;
+}
+
 // Handle delete
 if (isset($_GET['delete']) && isset($_GET['type'])) {
     $type = $_GET['type'];
@@ -50,10 +90,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $security_question = trim($_POST['security_question'] ?? '');
+    $security_answer = trim($_POST['security_answer'] ?? '');
     
     if (empty($firstname) || empty($lastname) || empty($phone) || empty($email) || empty($username)) {
         $error = "Please fill in all required fields";
+    } elseif (!$user_id && $user_type !== 'admin' && (empty($security_question) || empty($security_answer))) {
+        // Security question required for new users (not admins)
+        $error = "Please fill in security question and answer";
     } else {
+        // Validate password if provided
+        if (!empty($password)) {
+            $password_errors = validatePassword($password);
+            if (!empty($password_errors)) {
+                $error = implode(". ", $password_errors);
+            }
+        }
+    }
+    
+    if (empty($error)) {
         try {
             if ($user_type === 'admin') {
                 if ($user_id) {
@@ -89,6 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt = $conn->prepare("UPDATE RECEPTIONIST SET FirstName = ?, LastName = ?, PhoneNo = ?, Email = ?, Username = ? WHERE RecId = ?");
                         $stmt->execute([$firstname, $lastname, $phone, $email, $username, $user_id]);
                     }
+                    // Update security question if provided
+                    if (!empty($security_question) && !empty($security_answer)) {
+                        $stmt = $conn->prepare("UPDATE RECEPTIONIST SET SecurityQuestion = ?, SecurityAnswer = ? WHERE RecId = ?");
+                        $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                    }
                     $message = "Receptionist updated successfully";
                 } else {
                     // Insert new receptionist
@@ -96,8 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error = "Password is required for new receptionist";
                     } else {
                         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                        $stmt = $conn->prepare("INSERT INTO RECEPTIONIST (FirstName, LastName, PhoneNo, Email, Username, Password) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt->execute([$firstname, $lastname, $phone, $email, $username, $hashed_password]);
+                        $stmt = $conn->prepare("INSERT INTO RECEPTIONIST (FirstName, LastName, PhoneNo, Email, Username, Password, SecurityQuestion, SecurityAnswer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$firstname, $lastname, $phone, $email, $username, $hashed_password, $security_question, strtolower(trim($security_answer))]);
                         $message = "Receptionist added successfully";
                     }
                 }
@@ -115,6 +175,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt = $conn->prepare("UPDATE ADVOCATE SET FirstName = ?, LastName = ?, PhoneNo = ?, Email = ?, Address = ?, Username = ?, Status = ? WHERE AdvtId = ?");
                         $stmt->execute([$firstname, $lastname, $phone, $email, $address, $username, $status, $user_id]);
                     }
+                    // Update security question if provided
+                    if (!empty($security_question) && !empty($security_answer)) {
+                        $stmt = $conn->prepare("UPDATE ADVOCATE SET SecurityQuestion = ?, SecurityAnswer = ? WHERE AdvtId = ?");
+                        $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                    }
                     $message = "Advocate updated successfully";
                 } else {
                     // Insert new advocate
@@ -122,8 +187,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error = "Password is required for new advocate";
                     } else {
                         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                        $stmt = $conn->prepare("INSERT INTO ADVOCATE (FirstName, LastName, PhoneNo, Email, Address, Username, Password, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                        $stmt->execute([$firstname, $lastname, $phone, $email, $address, $username, $hashed_password, $status]);
+                        $stmt = $conn->prepare("INSERT INTO ADVOCATE (FirstName, LastName, PhoneNo, Email, Address, Username, Password, Status, SecurityQuestion, SecurityAnswer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->execute([$firstname, $lastname, $phone, $email, $address, $username, $hashed_password, $status, $security_question, strtolower(trim($security_answer))]);
                         $message = "Advocate added successfully";
                     }
                 }
@@ -158,6 +223,11 @@ if (isset($_GET['edit']) && isset($_GET['type'])) {
             $stmt = $conn->prepare("SELECT * FROM ADVOCATE WHERE AdvtId = ?");
             $stmt->execute([$id]);
             $edit_user = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Load security question for editing
+        if ($edit_user && $edit_type !== 'admin') {
+            // Security question is already in the user data
         }
     } catch(PDOException $e) {
         $error = "Error loading user: " . $e->getMessage();
@@ -281,8 +351,50 @@ include 'header.php';
         <div class="form-group">
             <label for="password">Password <?php echo $edit_user ? '(leave blank to keep current)' : '*'; ?></label>
             <input type="password" id="password" name="password" 
-                   <?php echo $edit_user ? '' : 'required'; ?>>
+                   <?php echo $edit_user ? '' : 'required'; ?> minlength="8">
+            <?php if (!$edit_user): ?>
+                <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+                    Password must be at least 8 characters and contain: uppercase, lowercase, number, and special character
+                </small>
+            <?php endif; ?>
         </div>
+        
+        <?php if ($edit_user && ($edit_type === 'advocate' || $edit_type === 'receptionist')): ?>
+            <div class="form-group">
+                <label for="security_question">Security Question (leave blank to keep current)</label>
+                <select id="security_question" name="security_question">
+                    <option value="">-- Keep Current or Select New --</option>
+                    <?php foreach ($security_questions as $question): ?>
+                        <option value="<?php echo htmlspecialchars($question); ?>" 
+                                <?php echo (isset($edit_user['SecurityQuestion']) && $edit_user['SecurityQuestion'] === $question) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($question); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="security_answer">Security Answer (leave blank to keep current)</label>
+                <input type="text" id="security_answer" name="security_answer" 
+                       placeholder="Enter new answer to update">
+            </div>
+        <?php elseif (!$edit_user): ?>
+            <div class="form-group" id="security-question-group" style="display: none;">
+                <label for="security_question">Security Question *</label>
+                <select id="security_question" name="security_question">
+                    <option value="">-- Select a Security Question --</option>
+                    <?php foreach ($security_questions as $question): ?>
+                        <option value="<?php echo htmlspecialchars($question); ?>"><?php echo htmlspecialchars($question); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group" id="security-answer-group" style="display: none;">
+                <label for="security_answer">Security Answer *</label>
+                <input type="text" id="security_answer" name="security_answer" 
+                       placeholder="Enter security answer">
+            </div>
+        <?php endif; ?>
         
         <div class="form-actions">
             <button type="submit" class="btn btn-primary"><?php echo $edit_user ? 'Update User' : 'Add User'; ?></button>
@@ -423,18 +535,37 @@ include 'header.php';
 </div>
 
 <script>
-// Show/hide address and status fields based on user type
+// Show/hide address, status, and security question fields based on user type
 document.getElementById('user_type')?.addEventListener('change', function() {
     const userType = this.value;
     const addressGroup = document.getElementById('address-group');
     const statusGroup = document.getElementById('status-group');
+    const securityQuestionGroup = document.getElementById('security-question-group');
+    const securityAnswerGroup = document.getElementById('security-answer-group');
+    const securityQuestionSelect = securityQuestionGroup ? securityQuestionGroup.querySelector('select') : null;
+    const securityAnswerInput = securityAnswerGroup ? securityAnswerGroup.querySelector('input') : null;
     
     if (userType === 'advocate') {
         if (addressGroup) addressGroup.style.display = 'block';
         if (statusGroup) statusGroup.style.display = 'block';
+        if (securityQuestionGroup) securityQuestionGroup.style.display = 'block';
+        if (securityAnswerGroup) securityAnswerGroup.style.display = 'block';
+        if (securityQuestionSelect) securityQuestionSelect.required = true;
+        if (securityAnswerInput) securityAnswerInput.required = true;
+    } else if (userType === 'receptionist') {
+        if (addressGroup) addressGroup.style.display = 'none';
+        if (statusGroup) statusGroup.style.display = 'none';
+        if (securityQuestionGroup) securityQuestionGroup.style.display = 'block';
+        if (securityAnswerGroup) securityAnswerGroup.style.display = 'block';
+        if (securityQuestionSelect) securityQuestionSelect.required = true;
+        if (securityAnswerInput) securityAnswerInput.required = true;
     } else {
         if (addressGroup) addressGroup.style.display = 'none';
         if (statusGroup) statusGroup.style.display = 'none';
+        if (securityQuestionGroup) securityQuestionGroup.style.display = 'none';
+        if (securityAnswerGroup) securityAnswerGroup.style.display = 'none';
+        if (securityQuestionSelect) securityQuestionSelect.required = false;
+        if (securityAnswerInput) securityAnswerInput.required = false;
     }
 });
 </script>
