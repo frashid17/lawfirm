@@ -145,11 +145,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$firstname, $lastname, $phone, $email, $username, $user_id]);
                     }
                     // Update security question if provided
-                    if (!empty($security_question) && !empty($security_answer)) {
-                        $stmt = $conn->prepare("UPDATE RECEPTIONIST SET SecurityQuestion = ?, SecurityAnswer = ? WHERE RecId = ?");
-                        $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                    // If both question and answer are provided, update both
+                    // If only question is provided but answer is empty, check if user already has a question
+                    if (!empty($security_question)) {
+                        if (!empty($security_answer)) {
+                            // Both question and answer provided - update both
+                            $stmt = $conn->prepare("UPDATE RECEPTIONIST SET SecurityQuestion = ?, SecurityAnswer = ? WHERE RecId = ?");
+                            $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                        } else {
+                            // Only question provided - check if user already has an answer
+                            $stmt = $conn->prepare("SELECT SecurityAnswer FROM RECEPTIONIST WHERE RecId = ?");
+                            $stmt->execute([$user_id]);
+                            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if (!empty($existing['SecurityAnswer'])) {
+                                // User has existing answer, update only question
+                                $stmt = $conn->prepare("UPDATE RECEPTIONIST SET SecurityQuestion = ? WHERE RecId = ?");
+                                $stmt->execute([$security_question, $user_id]);
+                            } else {
+                                // No existing answer - require answer
+                                $error = "Security answer is required when setting a new security question.";
+                            }
+                        }
+                    } elseif (!empty($security_answer)) {
+                        // Only answer provided - update answer only if question exists
+                        $stmt = $conn->prepare("SELECT SecurityQuestion FROM RECEPTIONIST WHERE RecId = ?");
+                        $stmt->execute([$user_id]);
+                        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if (!empty($existing['SecurityQuestion'])) {
+                            $stmt = $conn->prepare("UPDATE RECEPTIONIST SET SecurityAnswer = ? WHERE RecId = ?");
+                            $stmt->execute([strtolower(trim($security_answer)), $user_id]);
+                        } else {
+                            $error = "Security question must be selected before setting an answer.";
+                        }
                     }
-                    $message = "Receptionist updated successfully";
+                    if (empty($error)) {
+                        $message = "Receptionist updated successfully";
+                    }
                 } else {
                     // Insert new receptionist
                     if (empty($password)) {
@@ -176,11 +207,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $stmt->execute([$firstname, $lastname, $phone, $email, $address, $username, $status, $user_id]);
                     }
                     // Update security question if provided
-                    if (!empty($security_question) && !empty($security_answer)) {
-                        $stmt = $conn->prepare("UPDATE ADVOCATE SET SecurityQuestion = ?, SecurityAnswer = ? WHERE AdvtId = ?");
-                        $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                    // If both question and answer are provided, update both
+                    // If only question is provided but answer is empty, check if user already has a question
+                    if (!empty($security_question)) {
+                        if (!empty($security_answer)) {
+                            // Both question and answer provided - update both
+                            $stmt = $conn->prepare("UPDATE ADVOCATE SET SecurityQuestion = ?, SecurityAnswer = ? WHERE AdvtId = ?");
+                            $stmt->execute([$security_question, strtolower(trim($security_answer)), $user_id]);
+                        } else {
+                            // Only question provided - check if user already has an answer
+                            $stmt = $conn->prepare("SELECT SecurityAnswer FROM ADVOCATE WHERE AdvtId = ?");
+                            $stmt->execute([$user_id]);
+                            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if (!empty($existing['SecurityAnswer'])) {
+                                // User has existing answer, update only question
+                                $stmt = $conn->prepare("UPDATE ADVOCATE SET SecurityQuestion = ? WHERE AdvtId = ?");
+                                $stmt->execute([$security_question, $user_id]);
+                            } else {
+                                // No existing answer - require answer
+                                $error = "Security answer is required when setting a new security question.";
+                            }
+                        }
+                    } elseif (!empty($security_answer)) {
+                        // Only answer provided - update answer only if question exists
+                        $stmt = $conn->prepare("SELECT SecurityQuestion FROM ADVOCATE WHERE AdvtId = ?");
+                        $stmt->execute([$user_id]);
+                        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if (!empty($existing['SecurityQuestion'])) {
+                            $stmt = $conn->prepare("UPDATE ADVOCATE SET SecurityAnswer = ? WHERE AdvtId = ?");
+                            $stmt->execute([strtolower(trim($security_answer)), $user_id]);
+                        } else {
+                            $error = "Security question must be selected before setting an answer.";
+                        }
                     }
-                    $message = "Advocate updated successfully";
+                    if (empty($error)) {
+                        $message = "Advocate updated successfully";
+                    }
                 } else {
                     // Insert new advocate
                     if (empty($password)) {
@@ -361,9 +423,9 @@ include 'header.php';
         
         <?php if ($edit_user && ($edit_type === 'advocate' || $edit_type === 'receptionist')): ?>
             <div class="form-group">
-                <label for="security_question">Security Question (leave blank to keep current)</label>
+                <label for="security_question">Security Question</label>
                 <select id="security_question" name="security_question">
-                    <option value="">-- Keep Current or Select New --</option>
+                    <option value="">-- <?php echo empty($edit_user['SecurityQuestion']) ? 'Select Security Question' : 'Keep Current or Select New'; ?> --</option>
                     <?php foreach ($security_questions as $question): ?>
                         <option value="<?php echo htmlspecialchars($question); ?>" 
                                 <?php echo (isset($edit_user['SecurityQuestion']) && $edit_user['SecurityQuestion'] === $question) ? 'selected' : ''; ?>>
@@ -371,12 +433,26 @@ include 'header.php';
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <?php if (empty($edit_user['SecurityQuestion'])): ?>
+                    <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+                        This user does not have a security question set. Please select one and provide an answer.
+                    </small>
+                <?php else: ?>
+                    <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+                        Current: <?php echo htmlspecialchars($edit_user['SecurityQuestion']); ?>. Leave blank to keep current, or select a new question and provide a new answer.
+                    </small>
+                <?php endif; ?>
             </div>
             
             <div class="form-group">
-                <label for="security_answer">Security Answer (leave blank to keep current)</label>
+                <label for="security_answer">Security Answer</label>
                 <input type="text" id="security_answer" name="security_answer" 
-                       placeholder="Enter new answer to update">
+                       placeholder="<?php echo empty($edit_user['SecurityQuestion']) ? 'Enter security answer (required if setting new question)' : 'Enter new answer to update (leave blank to keep current)'; ?>">
+                <?php if (empty($edit_user['SecurityQuestion'])): ?>
+                    <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+                        Required when setting a new security question.
+                    </small>
+                <?php endif; ?>
             </div>
         <?php elseif (!$edit_user): ?>
             <div class="form-group" id="security-question-group" style="display: none;">
