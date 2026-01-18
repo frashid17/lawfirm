@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Jan 17, 2026 at 06:48 AM
+-- Generation Time: Jan 18, 2026 at 01:21 PM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.0.28
 
@@ -43,7 +43,7 @@ CREATE TABLE `ADMIN` (
 --
 
 INSERT INTO `ADMIN` (`AdminId`, `FirstName`, `LastName`, `PhoneNo`, `Email`, `Username`, `Password`, `CreatedAt`) VALUES
-(1, 'System', 'Administrator', '1234567890', 'admin@lawfirm.com', 'admin', '$2y$10$q4RaSYSVt6WEkVPKYkNKLuO8Cc7k1M0AN56R1UlLNWvDRY1tXgra6', '2026-01-16 18:10:03');
+(1, 'System', 'Administrator', '1234567890', 'admin@lawfirm.com', 'admin', '$2y$10$PQE1MNQiIoAZt4Hb/bBUvemG6n04in2JJgbrY/Ti.37jRxwloj0be', '2026-01-16 18:10:03');
 
 -- --------------------------------------------------------
 
@@ -61,15 +61,20 @@ CREATE TABLE `ADVOCATE` (
   `Username` varchar(50) NOT NULL,
   `Password` varchar(255) NOT NULL,
   `Status` varchar(20) DEFAULT 'Active',
-  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp()
+  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  `SecurityQuestion` varchar(255) DEFAULT NULL,
+  `SecurityAnswer` varchar(255) DEFAULT NULL,
+  `IsLocked` tinyint(1) DEFAULT 0,
+  `FailedAttempts` int(11) DEFAULT 0,
+  `LockedAt` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `ADVOCATE`
 --
 
-INSERT INTO `ADVOCATE` (`AdvtId`, `FirstName`, `LastName`, `PhoneNo`, `Email`, `Address`, `Username`, `Password`, `Status`, `CreatedAt`) VALUES
-(1, 'John', 'Munyoki', '0987654321', 'john.munyoki@lawfirm.com', 'Nairobi, Kenya', 'advocate1', '$2y$10$YHDmRWNZbkRoaNup.KUJ7eClhR5chigMs5m7GASgbat8rwczYN4W.', 'Active', '2026-01-16 18:10:03');
+INSERT INTO `ADVOCATE` (`AdvtId`, `FirstName`, `LastName`, `PhoneNo`, `Email`, `Address`, `Username`, `Password`, `Status`, `CreatedAt`, `SecurityQuestion`, `SecurityAnswer`, `IsLocked`, `FailedAttempts`, `LockedAt`) VALUES
+(1, 'John', 'Munyoki', '0987654321', 'john.munyoki@lawfirm.com', 'Nairobi, Kenya', 'advocate1', '$2y$10$8D3iJsZmSYfOYqD.rHGqw.bIP8I2n10jMLo8pv70ahjjQHjVPgrom', 'Active', '2026-01-16 18:10:03', NULL, NULL, 0, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -181,15 +186,20 @@ CREATE TABLE `CLIENT_AUTH` (
   `Password` varchar(255) NOT NULL,
   `IsActive` tinyint(1) DEFAULT 1,
   `LastLogin` timestamp NULL DEFAULT NULL,
-  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp()
+  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  `SecurityQuestion` varchar(255) DEFAULT NULL,
+  `SecurityAnswer` varchar(255) DEFAULT NULL,
+  `IsLocked` tinyint(1) DEFAULT 0,
+  `FailedAttempts` int(11) DEFAULT 0,
+  `LockedAt` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `CLIENT_AUTH`
 --
 
-INSERT INTO `CLIENT_AUTH` (`AuthId`, `ClientId`, `Username`, `Password`, `IsActive`, `LastLogin`, `CreatedAt`) VALUES
-(1, 3, 'milkah', '$2y$10$8SZwlsW39xQpSxGrOkPumuuewgnmxowfFpyy8R.WPx7keX4LGVCP6', 1, '2026-01-17 05:03:18', '2026-01-16 18:55:00');
+INSERT INTO `CLIENT_AUTH` (`AuthId`, `ClientId`, `Username`, `Password`, `IsActive`, `LastLogin`, `CreatedAt`, `SecurityQuestion`, `SecurityAnswer`, `IsLocked`, `FailedAttempts`, `LockedAt`) VALUES
+(1, 3, 'milkah', '$2y$10$8SZwlsW39xQpSxGrOkPumuuewgnmxowfFpyy8R.WPx7keX4LGVCP6', 1, '2026-01-17 21:45:18', '2026-01-16 18:55:00', NULL, NULL, 0, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -317,15 +327,20 @@ CREATE TABLE `RECEPTIONIST` (
   `Email` varchar(100) NOT NULL,
   `Username` varchar(50) NOT NULL,
   `Password` varchar(255) NOT NULL,
-  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp()
+  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  `SecurityQuestion` varchar(255) DEFAULT NULL,
+  `SecurityAnswer` varchar(255) DEFAULT NULL,
+  `IsLocked` tinyint(1) DEFAULT 0,
+  `FailedAttempts` int(11) DEFAULT 0,
+  `LockedAt` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `RECEPTIONIST`
 --
 
-INSERT INTO `RECEPTIONIST` (`RecId`, `FirstName`, `LastName`, `PhoneNo`, `Email`, `Username`, `Password`, `CreatedAt`) VALUES
-(1, 'Mary', 'Maheli', '1122334455', 'mary.maheli@lawfirm.com', 'receptionist1', '$2y$10$xbrxvZ9AO9E7kAKj1EdnnuHRlRrccQHiO6BgL9BX.UV6yphkCRjAu', '2026-01-16 18:10:03');
+INSERT INTO `RECEPTIONIST` (`RecId`, `FirstName`, `LastName`, `PhoneNo`, `Email`, `Username`, `Password`, `CreatedAt`, `SecurityQuestion`, `SecurityAnswer`, `IsLocked`, `FailedAttempts`, `LockedAt`) VALUES
+(1, 'Mary', 'Maheli', '1122334455', 'mary.maheli@lawfirm.com', 'receptionist1', '$2y$10$mbvWY8tHpWz9b0R/DaXXLe8TDx/fKMaavKxC7yeTkAcpcbGvLdG9G', '2026-01-16 18:10:03', NULL, NULL, 0, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -382,7 +397,8 @@ ALTER TABLE `ADMIN`
 ALTER TABLE `ADVOCATE`
   ADD PRIMARY KEY (`AdvtId`),
   ADD UNIQUE KEY `Email` (`Email`),
-  ADD UNIQUE KEY `Username` (`Username`);
+  ADD UNIQUE KEY `Username` (`Username`),
+  ADD KEY `idx_advocate_locked` (`IsLocked`);
 
 --
 -- Indexes for table `BILLING`
@@ -425,7 +441,8 @@ ALTER TABLE `CLIENT_AUTH`
   ADD UNIQUE KEY `ClientId` (`ClientId`),
   ADD UNIQUE KEY `Username` (`Username`),
   ADD KEY `idx_username` (`Username`),
-  ADD KEY `idx_client` (`ClientId`);
+  ADD KEY `idx_client` (`ClientId`),
+  ADD KEY `idx_client_auth_locked` (`IsLocked`);
 
 --
 -- Indexes for table `CONTACT`
@@ -475,7 +492,8 @@ ALTER TABLE `PAYMENT_HISTORY`
 ALTER TABLE `RECEPTIONIST`
   ADD PRIMARY KEY (`RecId`),
   ADD UNIQUE KEY `Email` (`Email`),
-  ADD UNIQUE KEY `Username` (`Username`);
+  ADD UNIQUE KEY `Username` (`Username`),
+  ADD KEY `idx_receptionist_locked` (`IsLocked`);
 
 --
 -- Indexes for table `TASK`
