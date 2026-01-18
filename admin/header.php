@@ -39,6 +39,7 @@
                 <li><a href="calendar.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'calendar.php' ? 'active' : ''; ?>"><i class="fas fa-calendar"></i> Calendar</a></li>
                 <li><a href="users.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>"><i class="fas fa-user-cog"></i> Users</a></li>
                 <li><a href="create_client_account.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'create_client_account.php' ? 'active' : ''; ?>"><i class="fas fa-user-plus"></i> Client Accounts</a></li>
+                <li><a href="locked_accounts.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'locked_accounts.php' ? 'active' : ''; ?>"><i class="fas fa-lock"></i> Locked Accounts</a></li>
                 <li><a href="reports.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>"><i class="fas fa-chart-bar"></i> Reports</a></li>
                 <li><a href="profile.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : ''; ?>"><i class="fas fa-user"></i> Profile</a></li>
             </ul>
