@@ -17,6 +17,46 @@ require_once '../config/database.php';
 $error = "";
 $success = "";
 
+// Predefined security questions
+$security_questions = [
+    "What was the name of your first pet?",
+    "What city were you born in?",
+    "What was your mother's maiden name?",
+    "What was the name of your elementary school?",
+    "What was your childhood nickname?",
+    "What street did you grow up on?",
+    "What was the make of your first car?",
+    "What is your favorite movie?",
+    "What was the name of your first teacher?",
+    "What is your favorite food?",
+    "What was your favorite sport in high school?",
+    "What is the name of your best friend from childhood?",
+    "What was your favorite book as a child?",
+    "What is the name of the hospital where you were born?",
+    "What was your favorite vacation destination?"
+];
+
+// Password validation function
+function validatePassword($password) {
+    $errors = [];
+    if (strlen($password) < 8) {
+        $errors[] = "Password must be at least 8 characters long";
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        $errors[] = "Password must contain at least one uppercase letter";
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        $errors[] = "Password must contain at least one lowercase letter";
+    }
+    if (!preg_match('/[0-9]/', $password)) {
+        $errors[] = "Password must contain at least one number";
+    }
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+        $errors[] = "Password must contain at least one special character";
+    }
+    return $errors;
+}
+
 // Process registration form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $firstName = trim($_POST['firstName'] ?? '');
@@ -27,15 +67,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirmPassword'] ?? '';
+    $security_question = trim($_POST['security_question'] ?? '');
+    $security_answer = trim($_POST['security_answer'] ?? '');
     
     // Validation
-    if (empty($firstName) || empty($lastName) || empty($phoneNo) || empty($username) || empty($password)) {
+    if (empty($firstName) || empty($lastName) || empty($phoneNo) || empty($username) || empty($password) || empty($security_question) || empty($security_answer)) {
         $error = "Please fill in all required fields";
     } elseif ($password !== $confirmPassword) {
         $error = "Passwords do not match";
-    } elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long";
     } else {
+        // Validate password strength
+        $password_errors = validatePassword($password);
+        if (!empty($password_errors)) {
+            $error = implode(". ", $password_errors);
+        }
+    }
+    
+    if (empty($error)) {
         try {
             // Check if username already exists
             $stmt = $conn->prepare("SELECT AuthId FROM CLIENT_AUTH WHERE Username = ?");
@@ -72,8 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                             
                             // Insert into CLIENT_AUTH table
-                            $stmt = $conn->prepare("INSERT INTO CLIENT_AUTH (ClientId, Username, Password, IsActive) VALUES (?, ?, ?, 1)");
-                            $stmt->execute([$clientId, $username, $hashedPassword]);
+                            $stmt = $conn->prepare("INSERT INTO CLIENT_AUTH (ClientId, Username, Password, SecurityQuestion, SecurityAnswer, IsActive) VALUES (?, ?, ?, ?, ?, 1)");
+                            $stmt->execute([$clientId, $username, $hashedPassword, $security_question, strtolower(trim($security_answer))]);
                             
                             // Commit transaction
                             $conn->commit();
@@ -476,7 +524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-lock"></i> Password <span style="color: rgba(255, 255, 255, 0.7);">*</span>
                     </label>
                     <div class="input-wrapper">
-                        <input type="password" id="password" name="password" required placeholder="Enter password (min. 6 characters)">
+                        <input type="password" id="password" name="password" required placeholder="Enter password (min. 8 characters)" minlength="8">
                         <i class="fas fa-lock input-icon"></i>
                     </div>
                 </div>
@@ -486,8 +534,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-lock"></i> Confirm Password <span style="color: rgba(255, 255, 255, 0.7);">*</span>
                     </label>
                     <div class="input-wrapper">
-                        <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Confirm your password">
+                        <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Confirm your password" minlength="8">
                         <i class="fas fa-lock input-icon"></i>
+                    </div>
+                    <small style="color: rgba(255, 255, 255, 0.8); font-size: 12px; display: block; margin-top: 5px;">
+                        Password must be at least 8 characters and contain: uppercase, lowercase, number, and special character
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="security_question">
+                        <i class="fas fa-question-circle"></i> Security Question <span style="color: rgba(255, 255, 255, 0.7);">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <select id="security_question" name="security_question" required style="appearance: none; -webkit-appearance: none; -moz-appearance: none;">
+                            <option value="">-- Select a Security Question --</option>
+                            <?php foreach ($security_questions as $question): ?>
+                                <option value="<?php echo htmlspecialchars($question); ?>"><?php echo htmlspecialchars($question); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <i class="fas fa-chevron-down input-icon"></i>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="security_answer">
+                        <i class="fas fa-key"></i> Security Answer <span style="color: rgba(255, 255, 255, 0.7);">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="security_answer" name="security_answer" required placeholder="Enter your answer">
+                        <i class="fas fa-key input-icon"></i>
                     </div>
                 </div>
                 
